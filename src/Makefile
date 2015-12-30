@@ -3,8 +3,8 @@ OBJS=$(addprefix build/, $(SRC:.c=.o))
 
 TARGET=build/libUnchainedSocket.a
 
-LDFLAGS=-lpthread -lBlocksRuntime
-CFLAGS=-g --std=c99 -D_GNU_SOURCE -fblocks
+LDFLAGS=-lpthread
+CFLAGS=-g --std=c99 -D_GNU_SOURCE
 
 all: $(TARGET)
 
