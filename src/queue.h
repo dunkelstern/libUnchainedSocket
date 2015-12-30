@@ -1,8 +1,19 @@
+//
+//  queue.h
+//  UnchainedSocket
+//
+//  Created by Johannes Schriewer on 30/12/15.
+//  Copyright © 2015 Johannes Schriewer. All rights reserved.
+//
+
 #ifndef __queue_h
 #define __queue_h
 
 /** Opaque work queue handle */
 typedef struct _work_queue *work_queue;
+
+/** cleanup function for a work task */
+typedef void (*cleanup)(void *data);
 
 /** Worker callback function pointer type */
 typedef void (*work_task)(void *data);
@@ -20,9 +31,8 @@ work_queue queue_create(int worker_count);
  * Freeing is only possible if there are no tasks queued.
  * Function blocks until all threads have finished
  * @param queue: The queue to free, handle will be invalid after this call
- * @returns true if the queue could be freed, false if there were tasks queued.
  */
-bool queue_free(work_queue queue);
+void queue_free(work_queue queue);
 
 /** Resume work
  *
@@ -51,6 +61,6 @@ int queue_taskcount(work_queue queue);
  * @param task: callback
  * @param data: data to send to the callback
  */
-void queue_add_task(work_queue queue, work_task task, void *data);
+void queue_add_task(work_queue queue, work_task task, cleanup clean, void *data);
 
 #endif /* __queue_h */

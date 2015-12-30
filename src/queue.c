@@ -1,3 +1,11 @@
+//
+//  queue.c
+//  UnchainedSocket
+//
+//  Created by Johannes Schriewer on 30/12/15.
+//  Copyright © 2015 Johannes Schriewer. All rights reserved.
+//
+
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -7,6 +15,7 @@
 
 typedef struct _task_list {
 	work_task callback;
+    cleanup cleanup;
 	void *data;
 
 	struct _task_list *next;
@@ -53,16 +62,23 @@ work_queue queue_create(int worker_count) {
 	return q;
 }
 
-bool queue_free(work_queue queue) {
-	// queue can only be freed if no tasks are queued
-	if (queue->tasks) {
-		return false;	
-	}
+void queue_free(work_queue queue) {
+	// suspend the queue
+    queue->suspended = true;
 
-	// signal all threads to exit
-	queue->quit = true;
-	pthread_cond_broadcast(&queue->barrier);
+    // signal all threads to exit
+    queue->quit = true;
+    pthread_cond_broadcast(&queue->barrier);
 
+    // call cleanup functions for all queued tasks
+    pthread_mutex_lock(&queue->task_list_mutex);
+    task_list *t = queue->tasks;
+    while (t->next != NULL) {
+        t->cleanup(t->data);
+        t = t->next;
+    }
+    pthread_mutex_unlock(&queue->task_list_mutex);
+    
 	// wait for all threads to finish
 	for(int i = 0; i < queue->worker_count; i++) {
 		pthread_join(queue->threads[i], NULL);
@@ -74,7 +90,6 @@ bool queue_free(work_queue queue) {
 	pthread_mutex_destroy(&queue->task_list_mutex);
 	free(queue->threads);
 	free(queue);
-	return true;
 }
 
 void queue_resume(work_queue queue) {
@@ -94,7 +109,7 @@ int queue_taskcount(work_queue queue) {
 	pthread_mutex_lock(&queue->task_list_mutex);
 
 	// count items in task list
-	int i = 0;
+	int i = 1;
 	task_list *task = queue->tasks;
 	while ((task = task->next)) {
 		i++;
@@ -104,21 +119,29 @@ int queue_taskcount(work_queue queue) {
 	return i;
 }
 
-void queue_add_task(work_queue queue, work_task task, void *data) {
+void queue_add_task(work_queue queue, work_task task, cleanup clean, void *data) {
 	pthread_mutex_lock(&queue->task_list_mutex);
 
-	// fetch last list item
-	task_list *t = queue->tasks;
-	while (t->next != NULL) {
-		t = t->next;
-	}
 
 	// create new item
 	task_list *new_task = calloc(sizeof(task_list), 1);
 	new_task->callback = task;
+    new_task->cleanup = clean;
 	new_task->data = data;
 
-	t->next = new_task;
+    if (queue->tasks == NULL) {
+        // queue empty
+        queue->tasks = new_task;
+    } else {
+        // fetch last list item
+        task_list *t = queue->tasks;
+        while (t->next != NULL) {
+            t = t->next;
+        }
+        
+        // append new task
+        t->next = new_task;
+    }
 
 	// signal one thread to pick it up
 	pthread_mutex_unlock(&queue->task_list_mutex);
@@ -169,6 +192,7 @@ void *thread_start(void *data) {
 		task_list *task = queue_fetch_task(q);
 		if (task) {
 			task->callback(task->data);
+            task->cleanup(task->data);
 			free(task);
 		} else { 
 			// queue empty go to sleep
