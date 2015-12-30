@@ -12,8 +12,10 @@ clean:
 	rm -rf build
 
 install: $(TARGET)
+	@if [ ! -d "$(DESTDIR)/usr/local/lib" ] ; then mkdir -p "$(DESTDIR)/usr/local/lib" ; fi
+	@if [ ! -d "$(DESTDIR)/usr/local/include/unchainedSocket" ] ; then mkdir -p "$(DESTDIR)/usr/local/include/unchainedSocket" ; fi
 	install -m 0755 -t $(DESTDIR)/usr/local/lib $(TARGET)
-	install -m 0644 -t $(DESTDIR)/usr/local/include/unchainedSocket src/*.h
+	install -m 0644 -t $(DESTDIR)/usr/local/include/unchainedSocket *.h
 
 $(TARGET): $(OBJS)
 	ar -rc $(TARGET) $(OBJS)
