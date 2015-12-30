@@ -82,7 +82,7 @@ static struct selectMask build_select_mask(ServerHandle handle);
  * MARK: - API
  */
 
-ServerHandle server_init(char *listenIP, char *port, bool v4Only, int timeout) {
+ServerHandle server_init(const char *listenIP, const char *port, bool v4Only, int timeout) {
 
     // zero initialize needed structs
     ServerHandle handle = calloc(sizeof(struct _ServerHandle), 1);
@@ -97,7 +97,7 @@ ServerHandle server_init(char *listenIP, char *port, bool v4Only, int timeout) {
     pthread_mutex_init(&handle->connectionMutex, NULL);
 
     // address to listen on
-    char *address = listenIP;
+    const char *address = listenIP;
 
     // if only IPv4 is requested filter for that
     hints.ai_family = (v4Only) ? PF_INET : PF_UNSPEC;
@@ -217,7 +217,7 @@ void server_stop(ServerHandle handle) {
 	free(handle);
 }
 
-void server_send_data(Connection *connection, char *data, size_t len) {
+void server_send_data(Connection *connection, const char *data, size_t len) {
     connection->sending = true;
     
     size_t bytesWritten = 0;
@@ -245,8 +245,8 @@ void server_send_data(Connection *connection, char *data, size_t len) {
     connection->sending = false;
 }
 
-void server_send_file(Connection *connection, char *filename) {
-    // open file
+void server_send_file(Connection *connection, const char *filename) {
+    // open filne
     int fd = open(filename, O_RDONLY);
     if (fd < 0) {
         DebugLog("[SEND:%d] Could not open file: %s\n", connection->id, strerror(errno));
@@ -373,6 +373,7 @@ static void accept_connection(ServerHandle handle) {
     
     // create a new connection struct
     Connection *conn = calloc(sizeof(Connection), 1);
+	conn->remoteIP = calloc(45, sizeof(char));
     conn->fd = fd;
     conn->id = handle->connectionID++;
     
@@ -414,7 +415,10 @@ static void close_idle_connections(ServerHandle handle) {
 
             // close this connection
             close(connection->fd);
-            
+           
+		   	// free remote ip pointer
+			free(connection->remoteIP);
+
             // remove from list
             if (i == handle->numConnections - 1) {
                 // last one, just decrement connection count
@@ -444,6 +448,8 @@ static void close_connection(ServerHandle handle, Connection *connection) {
     // remove from open connection list
     for(int i = 0; i < handle->numConnections; i++) {
         if (handle->connections[i] == connection) {
+			free(connection->remoteIP);
+
             if (i == handle->numConnections - 1) {
                 // last one, just decrement connection count
                 handle->numConnections--;

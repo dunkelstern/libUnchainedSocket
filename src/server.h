@@ -17,7 +17,7 @@
 typedef struct _Connection {
 	int id;         /**< Connection ID */
 
-	char remoteIP[45]; /**< Remote IP address */
+	char *remoteIP; /**< Remote IP address */
 	int remotePort; /**< Remote port */
     
     // internal
@@ -29,7 +29,7 @@ typedef struct _Connection {
 typedef struct _ServerHandle *ServerHandle;
 
 /** Data Receive callback, return false if you want the server to terminate the connection */
-typedef bool (*ReceiveCallback)(Connection *connection, char *data, size_t size);
+typedef bool (*ReceiveCallback)(Connection *connection, const char *data, size_t size);
 
 /** Initialize server
  *
@@ -38,7 +38,7 @@ typedef bool (*ReceiveCallback)(Connection *connection, char *data, size_t size)
  * @param v4Only: set to true to listen only on IPv4 sockets
  * @param timeout: socket idle timeout in seconds (close socket when not receiving data for this amount of time)
  */
-ServerHandle server_init(char *listenIP, char *port, bool v4Only, int timeout);
+ServerHandle server_init(const char *listenIP, const char *port, bool v4Only, int timeout);
 
 /** Start a server
  *
@@ -59,14 +59,14 @@ void server_stop(ServerHandle handle);
  * @param data: data to send
  * @param len: length of the data to send
  */
-void server_send_data(Connection *connection, char *data, size_t len);
+void server_send_data(Connection *connection, const char *data, size_t len);
 
 /** Send a file back to the connected client
  *
  * @param connection: the connection to send the data to
  * @param filename: path to the file to send
  */
-void server_send_file(Connection *connection, char *filename);
+void server_send_file(Connection *connection, const char *filename);
 
 
 #endif /* __server_h */
