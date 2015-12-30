@@ -408,6 +408,8 @@ static void close_idle_connections(ServerHandle handle) {
     for(int i = 0; i < handle->numConnections; i++) {
         Connection *connection = handle->connections[i];
         if (connection->sending == false) {
+            DebugLog("[IDLE] closing idle connection %d\n", connection->id);
+
             // close this connection
             close(connection->fd);
             
@@ -434,6 +436,7 @@ static void close_connection(ServerHandle handle, Connection *connection) {
     pthread_mutex_lock(&handle->connectionMutex);
 
     // close file descriptor
+    DebugLog("[CLOSE] closing connection %d\n", connection->id);
     close(connection->fd);
     
     // remove from open connection list
@@ -503,19 +506,23 @@ void read_task(void *data) {
         if ((bytesRead < 0) && (errno != EINTR)) {
             // unrecoverable error
             if (errno != EAGAIN) {
+                DebugLog("[READ] error: %s\n", strerror(errno));
                 close_connection(info->handle, info->connection);
             }
             return;
         } else if (bytesRead == 0) {
             // end of file, aka connection closed
+            DebugLog("[READ] EOF, closing connection\n");
             close_connection(info->handle, info->connection);
             return;
         }
     } while (bytesRead < 0);
     
     buffer[bytesRead] = 0;
+    DebugLog("[READ] read %d bytes\n", (int)bytesRead);
     bool keepConnection = info->handle->onReceive(info->connection, buffer, bytesRead);
     if (!keepConnection) {
+        DebugLog("[READ] closing connection upon request\n");
         close_connection(info->handle, info->connection);
     }
 }
