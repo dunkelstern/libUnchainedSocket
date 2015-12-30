@@ -29,7 +29,7 @@ typedef struct _Connection {
 typedef struct _ServerHandle *ServerHandle;
 
 /** Data Receive callback, return false if you want the server to terminate the connection */
-typedef bool (*ReceiveCallback)(Connection *connection, const char *data, size_t size);
+typedef bool (^ReceiveCallback)(Connection *connection, const char *data, size_t size);
 
 /** Initialize server
  *
