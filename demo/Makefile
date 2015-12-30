@@ -3,7 +3,7 @@ OBJS=$(addprefix build/, $(SRC:.c=.o))
 
 TARGET=build/demo
 
-LDFLAGS=-lpthread -L../src/build -lunchainedsocket
+LDFLAGS=-lpthread -L../src/build -lUnchainedSocket
 CFLAGS=-g --std=c99 -D_GNU_SOURCE -I../src
 
 all: $(OBJS)
