@@ -315,12 +315,14 @@ void *listener(void *data) {
     // prepare timeout
     struct timeval tv;
     memset(&tv, 0, sizeof(struct timeval));
-    tv.tv_sec = handle->timeout;
     
     DebugLog("[Listenter thread] Hello\n");
     
     // select loop
 	while (42) {
+        // reset timeout as linux rewrites it with the unused time
+        tv.tv_sec = handle->timeout;
+
         // select on all open connections until someone has something to read
         struct selectMask msk = build_select_mask(handle);
         int result = select(msk.maxFD + 1, &msk.readSet, NULL, NULL, &tv);
