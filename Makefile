@@ -7,4 +7,4 @@ clean:
 	make -C demo clean
 
 install:
-	make -C src install
+	make -C src install DESTDIR=$(DESTDIR)
