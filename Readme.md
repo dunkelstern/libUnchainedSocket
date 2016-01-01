@@ -18,7 +18,7 @@ C interface:
 #include <unchainedSocket/server.h>
 
 // data receive callback
-bool receiveCallback(Connection *connection, char *data, size_t size) {
+bool receiveCallback(Connection *connection, void *userData, const char *data, size_t size) {
 	// log the data
     printf("[%d] %s:%d: %s\n", connection->id, connection->remoteIP, connection->remotePort, data);
     
@@ -35,7 +35,7 @@ if (handle == NULL) {
 }
     
 // start listening with 10 parallel worker threads
-if (!server_start(handle, &receiveCallback, 10)) {
+if (!server_start(handle, &receiveCallback, NULL, 10)) {
     printf("Unable to listen to socket!\n");
     abort();
 }
