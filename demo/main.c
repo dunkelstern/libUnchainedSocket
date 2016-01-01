@@ -14,7 +14,7 @@
 
 #include "server.h"
 
-bool receiveCallback(Connection *connection, char *data, size_t size) {
+bool receiveCallback(Connection *connection, void *userData, const char *data, size_t size) {
     printf("[%d] %s:%d: %s\n", connection->id, connection->remoteIP, connection->remotePort, data);
     return true; // continue receiving data
 }
@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
     
     // start listening
     printf("Listening on *:4567...\n");
-    if (!server_start(handle, &receiveCallback, 10)) {
+    if (!server_start(handle, &receiveCallback, NULL, 10)) {
         printf("Unable to listen to socket!\n");
         abort();
     }

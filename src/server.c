@@ -36,6 +36,7 @@
 struct _ServerHandle {
     // user settings
     ReceiveCallback onReceive;  // receive callback function
+	void *userData;				// user data given to the data callback verbatim
     int timeout;                // socket read timeout
 
     // socket specific
@@ -172,13 +173,14 @@ ServerHandle server_init(const char *listenIP, const char *port, bool v4Only, in
 	return handle;
 }
 
-bool server_start(ServerHandle handle, ReceiveCallback onReceive, int workerCount) {
+bool server_start(ServerHandle handle, ReceiveCallback onReceive, void *userData, int workerCount) {
 	if (handle->onReceive) {
 		// already running
 		return false;
 	}
     handle->onReceive = onReceive;
     handle->queue = queue_create(workerCount);
+	handle->userData = userData;
     queue_resume(handle->queue);
 
     // start listening
@@ -528,7 +530,7 @@ void read_task(void *data) {
     
     buffer[bytesRead] = 0;
     DebugLog("[READ] read %d bytes\n", (int)bytesRead);
-    bool keepConnection = info->handle->onReceive(info->connection, buffer, bytesRead);
+    bool keepConnection = info->handle->onReceive(info->connection, info->handle->userData, buffer, bytesRead);
     if (!keepConnection) {
         DebugLog("[READ] closing connection upon request\n");
         close_connection(info->handle, info->connection);

@@ -29,7 +29,7 @@ typedef struct _Connection {
 typedef struct _ServerHandle *ServerHandle;
 
 /** Data Receive callback, return false if you want the server to terminate the connection */
-typedef bool (*ReceiveCallback)(Connection *connection, const char *data, size_t size);
+typedef bool (*ReceiveCallback)(Connection *connection, void *userData, const char *data, size_t size);
 
 /** Initialize server
  *
@@ -45,7 +45,7 @@ ServerHandle server_init(const char *listenIP, const char *port, bool v4Only, in
  * @param handle: Server handle
  */
 
-bool server_start(ServerHandle handle, ReceiveCallback onReceive, int workerCount);
+bool server_start(ServerHandle handle, ReceiveCallback onReceive, void *userData, int workerCount);
 
 /** Stop a server
  *
