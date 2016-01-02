@@ -14,8 +14,8 @@ clean:
 install: $(TARGET)
 	@if [ ! -d "$(DESTDIR)/usr/local/lib" ] ; then mkdir -p "$(DESTDIR)/usr/local/lib" ; fi
 	@if [ ! -d "$(DESTDIR)/usr/local/include/unchainedSocket" ] ; then mkdir -p "$(DESTDIR)/usr/local/include/unchainedSocket" ; fi
-	install -m 0755 -t $(DESTDIR)/usr/local/lib $(TARGET)
-	install -m 0644 -t $(DESTDIR)/usr/local/include/unchainedSocket *.h
+	install -m 0755 $(TARGET) $(DESTDIR)/usr/local/lib
+	install -m 0644 *.h $(DESTDIR)/usr/local/include/unchainedSocket
 
 $(TARGET): $(OBJS)
 	ar -rc $(TARGET) $(OBJS)
