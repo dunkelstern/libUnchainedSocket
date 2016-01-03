@@ -450,7 +450,10 @@ static void close_connection(ServerHandle handle, Connection *connection) {
     // remove from open connection list
     for(int i = 0; i < handle->numConnections; i++) {
         if (handle->connections[i] == connection) {
-			free(connection->remoteIP);
+            if (connection->remoteIP) {
+                free(connection->remoteIP);
+                connection->remoteIP = NULL;
+            }
 
             if (i == handle->numConnections - 1) {
                 // last one, just decrement connection count
