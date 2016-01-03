@@ -1,6 +1,6 @@
 module UnchainedSocket [system] {
 	header "/usr/local/include/unchainedSocket/server.h"
+	requires blocks
 	link "UnchainedSocket"
-	link "BlocksRuntime"
 	export *
 }
