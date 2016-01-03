@@ -1,4 +1,4 @@
-OS=`(sw_vers -productVersion &>/dev/null && echo osx) || echo linux`
+OS=`if [ -e /usr/bin/sw_vers ] ; then echo osx ; else echo linux ; fi`
 
 all: 
 	make -C src -f Makefile.$(OS)
