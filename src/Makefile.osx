@@ -1,0 +1,30 @@
+SRC=queue.c server.c
+OBJS=$(addprefix build/, $(SRC:.c=.o))
+
+TARGET=build/libUnchainedSocket
+
+STATIC_LDFLAGS=-static
+DYNAMIC_LDFLAGS=-dynamic -lpthread -current_version 1.0 -compatibility_version 1.0 -macosx_version_min 10.11
+CFLAGS=-g --std=c99 -D_GNU_SOURCE -arch x86_64 -fPIC -DDEBUG
+
+all: $(TARGET).dylib $(TARGET).a
+
+clean:
+	rm -rf build
+
+install: $(TARGET).a $(TARGET).dylib
+	@if [ ! -d "$(DESTDIR)/usr/local/lib" ] ; then mkdir -p "$(DESTDIR)/usr/local/lib" ; fi
+	@if [ ! -d "$(DESTDIR)/usr/local/include/unchainedSocket" ] ; then mkdir -p "$(DESTDIR)/usr/local/include/unchainedSocket" ; fi
+	install -m 0755 $(TARGET).a $(DESTDIR)/usr/local/lib
+	install -m 0755 $(TARGET).dylib $(DESTDIR)/usr/local/lib
+	install -m 0644 *.h $(DESTDIR)/usr/local/include/unchainedSocket
+
+$(TARGET).a: $(OBJS)
+	libtool $(STATIC_LDFLAGS) -o $(TARGET).a $(OBJS)
+
+$(TARGET).dylib: $(OBJS)
+	libtool $(DYNAMIC_LDFLAGS) -o $(TARGET).dylib $(OBJS)
+
+build/%.o: %.c
+	@if [ ! -d build ] ; then mkdir -p build ; fi
+	clang -c $< -o $@ $(CFLAGS)
