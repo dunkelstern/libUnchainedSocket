@@ -12,6 +12,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <time.h>
 
 /** Connection identifier */
 typedef struct _Connection {
@@ -19,10 +20,13 @@ typedef struct _Connection {
 
 	char *remoteIP; /**< Remote IP address */
 	int remotePort; /**< Remote port */
-    
+
     // internal
     int fd;         /**< Socket handle */
     bool sending;   /**< currently sending data */
+    bool receiving; /**< currently receiving data */
+
+    time_t lastTimeActive; /**< last time the socket has received or sent data */
 } Connection;
 
 /** Opaque server handle */

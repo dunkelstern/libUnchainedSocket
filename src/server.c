@@ -12,6 +12,7 @@
 #include <string.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <time.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -42,6 +43,7 @@ struct _ServerHandle {
     // socket specific
     int socket;                 // socket fd
     pthread_t socketListener;   // listener thread
+    int signalPipe[2];             // pipe to wake select thread
 
     // connections
     pthread_mutex_t connectionMutex;
@@ -95,6 +97,14 @@ ServerHandle server_init(const char *listenIP, const char *port, bool v4Only, in
     handle->allocatedConnections = 1000;
     handle->numConnections = 0;
     handle->connections = calloc(1000, sizeof(Connection *));
+    if (pipe(handle->signalPipe)) {
+        free(handle);
+        DebugLog("pipe call failed: %s\n", strerror(errno));
+        return NULL;
+    }
+    int flags = fcntl(handle->signalPipe[0], F_GETFL, 0);
+    fcntl(handle->signalPipe[0], F_SETFL, flags | O_NONBLOCK);
+
     pthread_mutex_init(&handle->connectionMutex, NULL);
 
     // address to listen on
@@ -201,6 +211,8 @@ void server_stop(ServerHandle handle) {
     // close the socket
     DebugLog("Closing socket\n");
 	close(handle->socket);
+    close(handle->signalPipe[0]);
+    close(handle->signalPipe[1]);
 
     // wait for the accept thread to finish
     DebugLog("Joining ACCEPT thread\n");
@@ -337,6 +349,13 @@ void *listener(void *data) {
             pthread_exit(NULL);
         }
 
+        // Clear signal pipe
+        if (FD_ISSET(handle->signalPipe[0], &msk.readSet)) {
+            DebugLog("[Listener thread] Woken up by signal pipe");
+            char buf[1000];
+            read(handle->signalPipe[0], buf, 1000);
+        }
+
         // Check if we can accept a connection
         if (FD_ISSET(handle->socket, &msk.readSet)) {
             accept_connection(handle);
@@ -378,6 +397,7 @@ static void accept_connection(ServerHandle handle) {
 	conn->remoteIP = calloc(45, sizeof(char));
     conn->fd = fd;
     conn->id = handle->connectionID++;
+    conn->lastTimeActive = time(NULL);
 
     // fill out the remote address and port
     if (remoteAddr.ss_family == AF_INET) {
@@ -412,7 +432,7 @@ static void close_idle_connections(ServerHandle handle) {
     int removedConnections = 0;
     for(int i = 0; i < handle->numConnections; i++) {
         Connection *connection = handle->connections[i];
-        if (connection->sending == false) {
+        if ((connection->sending == false) && (connection->lastTimeActive < time(NULL) - handle->timeout)) {
             DebugLog("[IDLE] closing idle connection %d\n", connection->id);
 
             // close this connection
@@ -474,6 +494,8 @@ static void read_data(ServerHandle handle, fd_set readable) {
     for(int i = 0; i < handle->numConnections; i++) {
         Connection *connection = handle->connections[i];
         if (FD_ISSET(connection->fd, &readable)) {
+            connection->receiving = true;
+            connection->lastTimeActive = time(NULL);
             struct readTaskData *data = malloc(sizeof(struct readTaskData));
             data->handle = handle;
             data->connection = connection;
@@ -487,13 +509,17 @@ static struct selectMask build_select_mask(ServerHandle handle) {
     FD_ZERO(&msk.readSet);
 
     // add socket itselt for selecting on 'accept' calls
-    msk.maxFD = handle->socket;
+    msk.maxFD = (handle->socket > handle->signalPipe[0]) ? handle->socket : handle->signalPipe[0];
     FD_SET(handle->socket, &msk.readSet);
+    FD_SET(handle->signalPipe[0], &msk.readSet);
 
     // add all open connections
     pthread_mutex_lock(&handle->connectionMutex);
     for(int i = 0; i < handle->numConnections; i++) {
         Connection *connection = handle->connections[i];
+        if (connection->receiving) {
+            continue;
+        }
         if (connection->fd > msk.maxFD) {
             msk.maxFD = connection->fd;
         }
@@ -522,6 +548,7 @@ void read_task(void *data) {
                 DebugLog("[READ] error: %s\n", strerror(errno));
                 close_connection(info->handle, info->connection);
             }
+            info->connection->receiving = false;
             return;
         } else if (bytesRead == 0) {
             // end of file, aka connection closed
@@ -538,6 +565,8 @@ void read_task(void *data) {
         DebugLog("[READ] closing connection upon request\n");
         close_connection(info->handle, info->connection);
     }
+    info->connection->receiving = false;
+    write(info->handle->signalPipe[1], "x", 1);
 }
 
 void clean_task(void *data) {
