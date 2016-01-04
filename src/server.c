@@ -159,14 +159,15 @@ ServerHandle server_init(const char *listenIP, const char *port, bool v4Only, in
     // allow socket address reuse to avoid being blocked for two minutes after restart
     int yes = 1;
     setsockopt(handle->socket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
-    freeaddrinfo(info);
 
     // bind to the selected address
     if (bind(handle->socket, cInfo->ai_addr, cInfo->ai_addrlen)) {
+        freeaddrinfo(info);
         free(handle);
         DebugLog("bind call failed: %s\n", strerror(errno));
         return NULL;
     }
+    freeaddrinfo(info);
 
     // all ready
 	return handle;
@@ -317,7 +318,7 @@ void *listener(void *data) {
     struct timeval tv;
     memset(&tv, 0, sizeof(struct timeval));
 
-    DebugLog("[Listenter thread] Hello\n");
+    DebugLog("[Listener thread] Hello\n");
 
     // select loop
 	while (42) {
@@ -332,7 +333,7 @@ void *listener(void *data) {
             // timeout, kick all open connections that are not sending currently
             close_idle_connections(handle);
         } else if ((result < 0) && (errno != EINTR) && (errno != EBADF)) {
-            DebugLog("[Listenter thread] Error in select: %s\n", strerror(errno));
+            DebugLog("[Listener thread] Error in select: %s\n", strerror(errno));
             pthread_exit(NULL);
         }
 
