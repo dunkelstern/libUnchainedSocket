@@ -200,6 +200,8 @@ bool server_start(ServerHandle handle, ReceiveCallback onReceive, void *userData
 		return false;
 	}
 
+    sleep(1);
+    
     // create a thread for the accept loop
     DebugLog("Starting ACCEPT thread\n");
 	pthread_create(&handle->socketListener, NULL, listener, handle);
