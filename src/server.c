@@ -42,14 +42,14 @@ struct _ServerHandle {
     // socket specific
     int socket;                 // socket fd
     pthread_t socketListener;   // listener thread
-    
+
     // connections
     pthread_mutex_t connectionMutex;
     Connection **connections;
     int numConnections;
     int allocatedConnections;
     int connectionID;
-    
+
     // worker queue
     work_queue queue;
 };
@@ -108,7 +108,7 @@ ServerHandle server_init(const char *listenIP, const char *port, bool v4Only, in
 		hints.ai_flags = AI_PASSIVE;
         address = NULL;
 	}
-    
+
     // we want a TCP socket
 	hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;
@@ -146,7 +146,7 @@ ServerHandle server_init(const char *listenIP, const char *port, bool v4Only, in
 
 		cInfo = cInfo->ai_next;
 	}
-    
+
     // create a socket
 	handle->socket = socket(cInfo->ai_family, cInfo->ai_socktype, cInfo->ai_protocol);
 	if (handle->socket < 0) {
@@ -163,12 +163,11 @@ ServerHandle server_init(const char *listenIP, const char *port, bool v4Only, in
 
     // bind to the selected address
     if (bind(handle->socket, cInfo->ai_addr, cInfo->ai_addrlen)) {
-        freeaddrinfo(info);
         free(handle);
         DebugLog("bind call failed: %s\n", strerror(errno));
         return NULL;
     }
-    
+
     // all ready
 	return handle;
 }
@@ -201,11 +200,11 @@ void server_stop(ServerHandle handle) {
     // close the socket
     DebugLog("Closing socket\n");
 	close(handle->socket);
-    
+
     // wait for the accept thread to finish
     DebugLog("Joining ACCEPT thread\n");
 	pthread_join(handle->socketListener, NULL);
-    
+
     // destroy the handle
     queue_free(handle->queue);
 
@@ -221,7 +220,7 @@ void server_stop(ServerHandle handle) {
 
 void server_send_data(Connection *connection, const char *data, size_t len) {
     connection->sending = true;
-    
+
     size_t bytesWritten = 0;
     while (bytesWritten < len) {
         // Try to send the data
@@ -231,17 +230,17 @@ void server_send_data(Connection *connection, const char *data, size_t len) {
             if (errno == EINTR) {
                 continue;
             }
-            
+
             if (errno == EAGAIN) {
                 // TODO: select on fd until writable instead of spinning
                 continue;
             }
-            
+
             // not recoverable
             DebugLog("[SEND:%d] Could not send data: %s\n", connection->id, strerror(errno));
             break;
         }
-        
+
         bytesWritten += result;
     }
     connection->sending = false;
@@ -261,7 +260,7 @@ void server_send_file(Connection *connection, const char *filename) {
     fstat(fd, &st);
     size_t fileSize = st.st_size;
 
-    
+
     // send file by using OS specific sendfile implementation
     connection->sending = true;
     off_t size = 0;
@@ -271,7 +270,7 @@ void server_send_file(Connection *connection, const char *filename) {
     // OSX way of sending a file
     while (bytesWritten < fileSize) {
         if (sendfile(fd, connection->fd, bytesWritten, &size, NULL, 0)) {
-            
+
             // buffer full?
             if (errno == EAGAIN) {
                 bytesWritten += size;
@@ -279,7 +278,7 @@ void server_send_file(Connection *connection, const char *filename) {
                 // TODO: select on the fd until writable again instead of spinning
                 continue;
             }
-            
+
             // unrecoverable error
             DebugLog("[SEND:%d] Could not send file: %s\n", connection->id, strerror(errno));
             break;
@@ -290,7 +289,7 @@ void server_send_file(Connection *connection, const char *filename) {
     // Linux way of sending a file
     while (bytesWritten < fileSize) {
         ssize_t result = sendfile(connection->fd, fd, &bytesWritten, fileSize - bytesWritten);
-        
+
         if ((result < 0) && (errno != EAGAIN)) {
             // unrecoverable error
             DebugLog("[SEND:%d] Could not send file: %s\n", connection->id, strerror(errno));
@@ -317,9 +316,9 @@ void *listener(void *data) {
     // prepare timeout
     struct timeval tv;
     memset(&tv, 0, sizeof(struct timeval));
-    
+
     DebugLog("[Listenter thread] Hello\n");
-    
+
     // select loop
 	while (42) {
         // reset timeout as linux rewrites it with the unused time
@@ -328,7 +327,7 @@ void *listener(void *data) {
         // select on all open connections until someone has something to read
         struct selectMask msk = build_select_mask(handle);
         int result = select(msk.maxFD + 1, &msk.readSet, NULL, NULL, &tv);
-        
+
         if (result == 0) {
             // timeout, kick all open connections that are not sending currently
             close_idle_connections(handle);
@@ -336,12 +335,12 @@ void *listener(void *data) {
             DebugLog("[Listenter thread] Error in select: %s\n", strerror(errno));
             pthread_exit(NULL);
         }
-        
+
         // Check if we can accept a connection
         if (FD_ISSET(handle->socket, &msk.readSet)) {
             accept_connection(handle);
         }
-        
+
         // check all open connections and start read threads
         if (result > 0) {
             read_data(handle, msk.readSet);
@@ -353,14 +352,14 @@ static void accept_connection(ServerHandle handle) {
     // zero out the remote address struct
     struct sockaddr_storage remoteAddr;
     memset(&remoteAddr, 0, sizeof(struct sockaddr_storage));
-    
+
     // wait for a client to connect
     DebugLog("[ACCEPT] Waiting for connection\n");
     socklen_t len = sizeof(struct sockaddr_storage);
     int fd;
     do {
         fd = accept(handle->socket, (struct sockaddr *)&remoteAddr, &len);
-    
+
         // if some error happened determine if it is recoverable
         if ((fd < 0) && (errno != EINTR)) {
             // unknown error die now
@@ -368,32 +367,32 @@ static void accept_connection(ServerHandle handle) {
             return;
         }
     } while (fd < 0);
-    
+
     // make socket non blocking
     int flags = fcntl(fd, F_GETFL, 0);
     fcntl(fd, F_SETFL, flags | O_NONBLOCK);
-    
+
     // create a new connection struct
     Connection *conn = calloc(sizeof(Connection), 1);
 	conn->remoteIP = calloc(45, sizeof(char));
     conn->fd = fd;
     conn->id = handle->connectionID++;
-    
+
     // fill out the remote address and port
     if (remoteAddr.ss_family == AF_INET) {
         struct sockaddr_in *addr = (struct sockaddr_in *)&remoteAddr;
         inet_ntop(remoteAddr.ss_family, (const void *)&addr->sin_addr, conn->remoteIP, 45);
         conn->remotePort = addr->sin_port;
-        
+
         DebugLog("[ACCEPT] Remote %s:%d\n", conn->remoteIP, conn->remotePort);
     } else if (remoteAddr.ss_family == AF_INET6) {
         struct sockaddr_in6 *addr = (struct sockaddr_in6 *)&remoteAddr;
         inet_ntop(remoteAddr.ss_family, (const void *)&addr->sin6_addr, conn->remoteIP, 45);
         conn->remotePort = addr->sin6_port;
-        
+
         DebugLog("[ACCEPT] Remote [%s]:%d\n", conn->remoteIP, conn->remotePort);
     }
-    
+
     // add connection to list
     pthread_mutex_lock(&handle->connectionMutex);
     if (handle->allocatedConnections == handle->numConnections) {
@@ -407,7 +406,7 @@ static void accept_connection(ServerHandle handle) {
 
 static void close_idle_connections(ServerHandle handle) {
     pthread_mutex_lock(&handle->connectionMutex);
-    
+
     // remove from open connection list
     int removedConnections = 0;
     for(int i = 0; i < handle->numConnections; i++) {
@@ -417,7 +416,7 @@ static void close_idle_connections(ServerHandle handle) {
 
             // close this connection
             close(connection->fd);
-           
+
 		   	// free remote ip pointer
 			free(connection->remoteIP);
 
@@ -433,10 +432,10 @@ static void close_idle_connections(ServerHandle handle) {
             }
         }
     }
-    
+
     // correct connection count
     handle->numConnections -= removedConnections;
-    
+
     pthread_mutex_unlock(&handle->connectionMutex);
 }
 
@@ -446,7 +445,7 @@ static void close_connection(ServerHandle handle, Connection *connection) {
     // close file descriptor
     DebugLog("[CLOSE] closing connection %d\n", connection->id);
     close(connection->fd);
-    
+
     // remove from open connection list
     for(int i = 0; i < handle->numConnections; i++) {
         if (handle->connections[i] == connection) {
@@ -465,7 +464,7 @@ static void close_connection(ServerHandle handle, Connection *connection) {
             }
         }
     }
-    
+
     pthread_mutex_unlock(&handle->connectionMutex);
 }
 
@@ -485,11 +484,11 @@ static void read_data(ServerHandle handle, fd_set readable) {
 static struct selectMask build_select_mask(ServerHandle handle) {
     struct selectMask msk;
     FD_ZERO(&msk.readSet);
-    
+
     // add socket itselt for selecting on 'accept' calls
     msk.maxFD = handle->socket;
     FD_SET(handle->socket, &msk.readSet);
-    
+
     // add all open connections
     pthread_mutex_lock(&handle->connectionMutex);
     for(int i = 0; i < handle->numConnections; i++) {
@@ -500,7 +499,7 @@ static struct selectMask build_select_mask(ServerHandle handle) {
         FD_SET(connection->fd, &msk.readSet);
     }
     pthread_mutex_unlock(&handle->connectionMutex);
-    
+
     // return the set
     return msk;
 }
@@ -512,7 +511,7 @@ static struct selectMask build_select_mask(ServerHandle handle) {
 void read_task(void *data) {
     struct readTaskData *info = (struct readTaskData *)data;
     char buffer[4096];
-    
+
     ssize_t bytesRead;
     do {
         bytesRead = read(info->connection->fd, buffer, 4096);
@@ -530,7 +529,7 @@ void read_task(void *data) {
             return;
         }
     } while (bytesRead < 0);
-    
+
     buffer[bytesRead] = 0;
     DebugLog("[READ] read %d bytes\n", (int)bytesRead);
     bool keepConnection = info->handle->onReceive(info->connection, info->handle->userData, buffer, bytesRead);
