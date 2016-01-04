@@ -351,7 +351,7 @@ void *listener(void *data) {
 
         // Clear signal pipe
         if (FD_ISSET(handle->signalPipe[0], &msk.readSet)) {
-            DebugLog("[Listener thread] Woken up by signal pipe");
+            DebugLog("[Listener thread] Woken up by signal pipe\n");
             char buf[1000];
             read(handle->signalPipe[0], buf, 1000);
         }
